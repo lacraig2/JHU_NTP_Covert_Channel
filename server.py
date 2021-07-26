@@ -14,9 +14,8 @@ def packet_callback(pkt):
             log.info(f"Received message: '{plaintext}'")
             if plaintext.startswith("echo"):
                 log.info(f"Got an echo. Responding")
-                send_message(pkt[IP].src,plaintext[4:],server=True)
-        else:
-            log.info(f"Received message {pkt[NTPExtensions].type}")
+                # ideally the source here wouldn't be hardcoded
+                send_message('192.168.10.1',plaintext[4:],server=True)
 
 '''
 This program gets a callback on packets from scapy.

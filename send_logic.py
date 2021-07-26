@@ -10,19 +10,15 @@ from base64 import b64decode
 from scapy.all import IP, UDP, NTP, NTPExtension, NTPHeader, NTPExtensions,send
 from custom_logger import log
 
+debug = False
+
 SIGN_MESSAGE_REQUEST = 0x0602
 SIGN_MESSAGE_RESPONSE = 0x8602
 SIGN_MESSAGE_ERROR_RESPONSE = 0xC602
 
+#rsa components
 exponent = 257
-
 backend = default_backend()
-
-private_key = rsa.generate_private_key(
-    public_exponent=exponent,
-    key_size=2048,
-    backend=backend
-)
 
 def encode_n(message):
     n = ord('\n')
@@ -42,8 +38,13 @@ def send_message(dst, msg,server=False):
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
     raw = b64decode(b"".join(pem.split(b"\n")[1:-1]))
-    msg_type = SIGN_MESSAGE_RESPONSE if server else SIGN_MESSAGE_REQUEST
-    log.info(f"Sending message of type server={server} {msg}")
+    if server:
+        msg_type = SIGN_MESSAGE_RESPONSE
+    else:
+        msg_type = SIGN_MESSAGE_REQUEST
+    log.info(f"Sending message of type server={server} '{msg}'")
     extension = NTPExtension(value=raw,len=len(raw)+4,type=msg_type)
     packet = IP(dst=dst)/UDP(dport=123)/NTPHeader()/NTPExtensions(extensions=[extension])
+    if debug:
+        print(packet.summary())
     send(packet)
