@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives import serialization
 from base64 import b64decode
 from scapy.all import IP, UDP, NTP, NTPExtension, NTPHeader, NTPExtensions,send
 from custom_logger import log
+from datetime import datetime
 
 debug = False
 
@@ -26,7 +27,7 @@ def encode_n(message):
         n = (n << 8) + b
     return n
 
-def send_message(dst, msg,server=False):
+def send_message(dst, msg, server=False):
     # max len 509 bytes
     assert len(msg) <= 509, "message too long"
     bytes_val = (len(msg)).to_bytes(2, 'little')
@@ -38,13 +39,19 @@ def send_message(dst, msg,server=False):
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
     raw = b64decode(b"".join(pem.split(b"\n")[1:-1]))
+    base = IP(dst=dst)/UDP(dport=123)
     if server:
         msg_type = SIGN_MESSAGE_RESPONSE
+        utc = datetime.utcnow()
+        mode = 4
+        header = NTPHeader(mode=mode,ref=utc,orig=utc,recv=utc,sent=utc)
+        extension = NTPExtension(value=raw,len=len(raw)+4,type=msg_type)
     else:
         msg_type = SIGN_MESSAGE_REQUEST
+        mode = 3
+        utc = None
+        header = NTPHeader(mode=mode,ref=utc,orig=utc,recv=utc,sent=utc)
+        extension = NTPExtension(value=raw,len=len(raw)+4,type=msg_type)
     log.info(f"Sending message of type server={server} '{msg}'")
-    extension = NTPExtension(value=raw,len=len(raw)+4,type=msg_type)
-    packet = IP(dst=dst)/UDP(dport=123)/NTPHeader()/NTPExtensions(extensions=[extension])
-    if debug:
-        print(packet.summary())
+    packet = base/header/NTPExtensions(extensions=[extension])
     send(packet)
