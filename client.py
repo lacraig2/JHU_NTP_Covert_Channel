@@ -20,8 +20,8 @@ log.info("starting up client...")
 
 log.info("starting sniffer thread")
 t = Thread(target=sniff, kwargs={"prn":packet_callback,
-                                "store": 0,
-                                "stop_filter": stop_filter})
+                                "store": 0,})
+                                #"stop_filter": stop_filter})
 t.start()
 
 log.info("starting stdin reading")

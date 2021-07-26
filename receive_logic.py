@@ -11,7 +11,7 @@ def decode_n(n):
     while n != 0:
         vals.append(n % 256)
         n = n // 256
-    return bytes(vals[::-1][1:])
+    return bytes(vals[::-1][1:-1])
 
 def decode_custom_ntp_packet(packet):
     raw_value = raw(packet[NTPExtensions].extensions[0].value)

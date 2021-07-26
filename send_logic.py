@@ -35,7 +35,6 @@ def send_message(dst, msg,server=False):
     assert len(msg) <= 509, "message too long"
     bytes_val = (len(msg)).to_bytes(2, 'little')
     message = bytes_val + msg.encode() + (509-len(msg))*b'\x00'
-    log.info(f"Sending message {message}")
     n = encode_n(message)
     pubkey = RSAPublicNumbers(e=exponent,n=n).public_key(backend)
     pem = pubkey.public_bytes(
