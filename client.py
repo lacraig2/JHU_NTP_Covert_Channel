@@ -2,10 +2,13 @@ from sys import stdin
 from scapy.all import NTP,NTPExtensions,sniff
 from custom_logger import log
 from send_logic import send_message, SIGN_MESSAGE_RESPONSE
-from threading import Thread
+from threading import Thread,Event 
 from receive_logic import decode_custom_ntp_packet
 
+should_shut_down = Event()
 
+def stop_filter(x):
+    return should_shut_down.is_set()
 
 def packet_callback(pkt):
     if NTP in pkt and NTPExtensions in pkt:
@@ -16,7 +19,9 @@ def packet_callback(pkt):
 log.info("starting up client...")
 
 log.info("starting sniffer thread")
-t = Thread(target=sniff, kwargs={"prn":packet_callback, "store": 0})
+t = Thread(target=sniff, kwargs={"prn":packet_callback,
+                                "store": 0,
+                                "stop_filter": stop_filter})
 t.start()
 
 log.info("starting stdin reading")
@@ -38,3 +43,5 @@ while True:
     else:
         buf += c
 
+should_shut_down.set()
+t.join()
