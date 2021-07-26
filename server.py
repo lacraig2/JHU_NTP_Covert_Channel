@@ -1,41 +1,22 @@
 #! /usr/bin/env python
-from scapy.all import UDP, IP, sniff, DNS,NTP,NTPExtensions
-from scapy.all import *
 import logging
+from scapy.all import NTP,NTPExtensions,sniff,IP
 from rich.logging import RichHandler
-from cryptography.hazmat.primitives.serialization import load_pem_public_key
-from cryptography.hazmat.backends import default_backend
-from base64 import b64encode
+from send_logic import send_message, SIGN_MESSAGE_REQUEST
+from receive_logic import decode_custom_ntp_packet
+from custom_logger import log
 
-backend = default_backend()
-
-
-FORMAT = "%(message)s"
-logging.basicConfig(
-    level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
-)
-
-log = logging.getLogger("rich")
-
-def decode_n(n):
-    vals = []
-    while n != 0:
-        vals.append(n % 256)
-        n = n // 256
-    return bytes(vals[::-1][1:])
 
 def packet_callback(pkt):
     if NTP in pkt and NTPExtensions in pkt:
-        raw_value = raw(pkt[NTPExtensions].extensions[0].value)
-        encoded = b64encode(raw_value)
-        pubkey_str = b"-----BEGIN PUBLIC KEY-----\n"+encoded+b"\n-----END PUBLIC KEY-----\n" 
-        pubkey = load_pem_public_key(pubkey_str,backend=backend)
-        pubkey_nums = pubkey.public_numbers()
-        n = pubkey_nums.n
-        message = decode_n(n)
-        message_len = int.from_bytes(message[0:2],"little")
-        plaintext = message[2:2+message_len]
-        log.info(f"Received message {plaintext} {len(plaintext)}")
+        if pkt[NTPExtensions].extensions[0].type == SIGN_MESSAGE_REQUEST:
+            plaintext =decode_custom_ntp_packet(pkt)
+            log.info(f"Received message: '{plaintext}'")
+            if plaintext.startswith("echo"):
+                log.info(f"Got an echo. Responding")
+                send_message(pkt[IP].src,plaintext[4:],server=True)
+        else:
+            log.info(f"Received message {pkt[NTPExtensions].type}")
 
 '''
 This program gets a callback on packets from scapy.
