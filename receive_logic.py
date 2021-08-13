@@ -1,10 +1,9 @@
 from scapy.all import NTPExtensions, raw
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
-from cryptography.hazmat.backends import default_backend
+from auth import cipher,backend
 from base64 import b64encode
 from custom_logger import log
 
-backend = default_backend()
 
 def decode_n(n):
     vals = []
@@ -12,6 +11,12 @@ def decode_n(n):
         vals.append(n % 256)
         n = n // 256
     return bytes(vals[::-1][1:-1])
+
+def decrypt_packet(packet):
+    decryptor = cipher.decryptor()
+    ct = decryptor.update(packet) 
+    decryptor.finalize()
+    return ct
 
 def decode_custom_ntp_packet(packet):
     raw_value = raw(packet[NTPExtensions].extensions[0].value)
@@ -21,6 +26,7 @@ def decode_custom_ntp_packet(packet):
     pubkey_nums = pubkey.public_numbers()
     n = pubkey_nums.n
     message = decode_n(n)
-    message_len = int.from_bytes(message[0:2],"little")
-    plaintext = message[2:2+message_len]
+    dec_message = decrypt_packet(message)
+    message_len = int.from_bytes(dec_message[0:2],"little")
+    plaintext = dec_message[2:2+message_len]
     return plaintext.decode()

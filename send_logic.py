@@ -1,7 +1,6 @@
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 import datetime
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey,RSAPublicNumbers
 from cryptography.hazmat.primitives import hashes
@@ -10,6 +9,8 @@ from base64 import b64decode
 from scapy.all import IP, UDP, NTP, NTPExtension, NTPHeader, NTPExtensions,send
 from custom_logger import log
 from datetime import datetime
+from auth import cipher, backend
+
 
 debug = False
 
@@ -19,7 +20,6 @@ SIGN_MESSAGE_ERROR_RESPONSE = 0xC602
 
 #rsa components
 exponent = 257
-backend = default_backend()
 
 def encode_n(message):
     n = ord('\n')
@@ -27,12 +27,21 @@ def encode_n(message):
         n = (n << 8) + b
     return n
 
-def send_message(dst, msg, server=False):
+def encrypt_packet(packet):
+    encryptor = cipher.encryptor()
+    ct = encryptor.update(packet)
+    encryptor.finalize()
+    return ct
+
+def send_message(dst, msg, server=False,keylen=4096):
     # max len 509 bytes
-    assert len(msg) <= 509, "message too long"
+    assert keylen==512 or keylen==1024 or keylen==2048 or keylen == 4096, "invalid RSA keysize"
+    msglen = keylen // 8
+    assert len(msg) <= msglen-3, f"message too long. Shouldn't be more than {msglen-3} bytes"
     bytes_val = (len(msg)).to_bytes(2, 'little')
-    message = bytes_val + msg.encode() + (509-len(msg))*b'\x00'
-    n = encode_n(message)
+    message = bytes_val + msg.encode() + (msglen-3-len(msg))*b'\x00'
+    enc_message = encrypt_packet(message)
+    n = encode_n(enc_message)
     pubkey = RSAPublicNumbers(e=exponent,n=n).public_key(backend)
     pem = pubkey.public_bytes(
         encoding=serialization.Encoding.PEM,
